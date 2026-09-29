@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VALORANT 2v2 Map & Agent Bann-System</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- MQTT via WebSockets für stabile Echtzeit-Synchronisierung -->
+  <!-- MQTT via WebSockets: Schnelle, stabile Live-Synchronisierung ohne Setup -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -149,7 +149,7 @@
     </button>
   </div>
 
-  <!-- Map Bann-Grid (13 Maps) -->
+  <!-- Map Bann-Grid (Alle 13 Maps) -->
   <div class="mb-6 bg-[#18222d] border border-[#2c3947] p-4 rounded">
     <div class="flex items-center justify-between mb-3 border-b border-[#2c3947] pb-2">
       <h2 class="font-val-header text-lg font-bold text-white flex items-center gap-2">
@@ -160,7 +160,7 @@
     <div id="maps-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2"></div>
   </div>
 
-  <!-- Agenten Bann-Grid (inkl. Tejo, Veto, Waylay) -->
+  <!-- Agenten Bann-Grid (inkl. Tejo, Veto, Waylay, Miks) -->
   <div class="mb-6 bg-[#18222d] border border-[#2c3947] p-4 rounded">
     <div class="flex items-center justify-between mb-3 border-b border-[#2c3947] pb-2">
       <h2 class="font-val-header text-lg font-bold text-white flex items-center gap-2">
@@ -203,7 +203,7 @@
     'Lotus', 'Sunset', 'Abyss', 'Summit', 'Corrode'
   ];
   
-  // Alle Agenten nach Rolle sortiert, inkl. Tejo, Veto und Waylay
+  // Alle Agenten inkl. Tejo, Veto, Waylay und Miks
   const AGENTS = [
     // Duelists
     { name: 'Jett', role: 'Duelist' }, { name: 'Reyna', role: 'Duelist' }, { name: 'Phoenix', role: 'Duelist' },
@@ -216,6 +216,7 @@
     // Controllers
     { name: 'Brimstone', role: 'Controller' }, { name: 'Omen', role: 'Controller' }, { name: 'Viper', role: 'Controller' },
     { name: 'Astra', role: 'Controller' }, { name: 'Harbor', role: 'Controller' }, { name: 'Clove', role: 'Controller' },
+    { name: 'Miks', role: 'Controller' },
     // Sentinels
     { name: 'Killjoy', role: 'Sentinel' }, { name: 'Cypher', role: 'Sentinel' }, { name: 'Sage', role: 'Sentinel' },
     { name: 'Chamber', role: 'Sentinel' }, { name: 'Deadlock', role: 'Sentinel' }, { name: 'Vyse', role: 'Sentinel' },
