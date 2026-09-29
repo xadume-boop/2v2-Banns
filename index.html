@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VALORANT 2v2 Map & Agent Bann-System</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- MQTT via WebSockets: Zuverlässig, stabil und ohne Server-Setup -->
+  <!-- MQTT via WebSockets für stabile Echtzeit-Synchronisierung -->
   <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Tungsten:wght@600;700&family=Oswald:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <style>
     :root {
       --val-red: #ff4655;
@@ -39,7 +39,7 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-size: 2.5rem;
+      font-size: 2.2rem;
       color: #ff4655;
       font-weight: 900;
       text-shadow: 0 0 16px rgba(255, 70, 85, 0.9);
@@ -63,11 +63,11 @@
           <h1 class="text-xl md:text-2xl font-bold tracking-wider font-val-header uppercase">VALORANT 2v2</h1>
           <span class="bg-[#ff4655]/20 text-[#ff4655] text-xs px-2 py-0.5 rounded font-bold uppercase tracking-wider">Bann-System</span>
         </div>
-        <p class="text-xs text-gray-400">Echtzeit-Synchronisierung • 5v5 Maps</p>
+        <p class="text-xs text-gray-400">Echtzeit-Synchronisierung • Alle 13 Standard 5v5 Maps</p>
       </div>
     </div>
 
-    <!-- Creator Badge & Raum-Controls -->
+    <!-- Creator Badge & Controls -->
     <div class="flex items-center gap-2 md:gap-3 flex-wrap">
       <div class="text-[11px] uppercase tracking-widest text-gray-400 font-semibold bg-white/5 border border-white/10 px-2.5 py-1 rounded flex items-center gap-1.5 shadow-sm">
         <span class="w-1.5 h-1.5 rounded-full bg-[#00f0ff] animate-pulse"></span>
@@ -142,25 +142,25 @@
     </div>
   </div>
 
-  <!-- Start Button für Phase 1 -->
+  <!-- Start Button -->
   <div id="start-phase-container" class="mb-6 flex justify-center">
     <button onclick="startBanPhase()" class="bg-[#ff4655] hover:bg-[#e03b49] text-white font-val-header text-lg tracking-wider px-8 py-2.5 rounded font-bold transition shadow-lg shadow-[#ff4655]/20">
       ▶ BANN-PHASE STARTEN
     </button>
   </div>
 
-  <!-- Map Bann-Grid -->
+  <!-- Map Bann-Grid (13 Maps) -->
   <div class="mb-6 bg-[#18222d] border border-[#2c3947] p-4 rounded">
     <div class="flex items-center justify-between mb-3 border-b border-[#2c3947] pb-2">
       <h2 class="font-val-header text-lg font-bold text-white flex items-center gap-2">
-        <span class="text-[#ff4655]">■</span> MAP-AUSWAHL & SPERREN (11 5v5 MAPS)
+        <span class="text-[#ff4655]">■</span> MAP-AUSWAHL & SPERREN (ALLE 13 STANDARD MAPS)
       </h2>
-      <span class="text-xs font-mono text-gray-400" id="maps-left-count">11 Maps übrig</span>
+      <span class="text-xs font-mono text-gray-400" id="maps-left-count">13 Maps übrig</span>
     </div>
-    <div id="maps-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2"></div>
+    <div id="maps-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2"></div>
   </div>
 
-  <!-- Agenten Bann-Grid -->
+  <!-- Agenten Bann-Grid (inkl. Tejo, Veto, Waylay) -->
   <div class="mb-6 bg-[#18222d] border border-[#2c3947] p-4 rounded">
     <div class="flex items-center justify-between mb-3 border-b border-[#2c3947] pb-2">
       <h2 class="font-val-header text-lg font-bold text-white flex items-center gap-2">
@@ -168,7 +168,7 @@
       </h2>
       <span class="text-xs font-mono text-gray-400" id="agent-bans-count">0/4 gebannt</span>
     </div>
-    <div id="agents-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2"></div>
+    <div id="agents-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-2"></div>
   </div>
 
   <!-- Seiten-Auswahl -->
@@ -176,12 +176,12 @@
     <h3 class="font-val-header text-xl text-white mb-2">SEITEN-AUSWAHL</h3>
     <p class="text-xs text-gray-400 mb-4" id="side-picker-label">Wählt Attack oder Defense:</p>
     <div class="flex justify-center gap-4">
-      <button onclick="pickSide('ATTACK')" class="bg-red-600 hover:bg-red-500 text-white font-val-header px-6 py-2 rounded text-base">ATTACK (ANGRIFF)</button>
-      <button onclick="pickSide('DEFENSE')" class="bg-blue-600 hover:bg-blue-500 text-white font-val-header px-6 py-2 rounded text-base">DEFENSE (VERTEIDIGUNG)</button>
+      <button onclick="pickSide('ATTACK')" class="bg-red-600 hover:bg-red-500 text-white font-val-header px-6 py-2 rounded text-base font-bold">ATTACK (ANGRIFF)</button>
+      <button onclick="pickSide('DEFENSE')" class="bg-blue-600 hover:bg-blue-500 text-white font-val-header px-6 py-2 rounded text-base font-bold">DEFENSE (VERTEIDIGUNG)</button>
     </div>
   </div>
 
-  <!-- Zusammenfassung / Match Card -->
+  <!-- Finale Match-Card -->
   <div id="final-summary-card" class="hidden mb-6 bg-gradient-to-r from-red-950/40 via-[#18222d] to-cyan-950/40 border border-white/20 p-5 rounded">
     <div class="flex flex-col md:flex-row items-center justify-between gap-4">
       <div>
@@ -196,25 +196,35 @@
   </div>
 
 <script>
-  // Valorant 5v5 Pool
-  const MAPS = ['Ascent', 'Bind', 'Haven', 'Split', 'Icebox', 'Breeze', 'Fracture', 'Pearl', 'Lotus', 'Sunset', 'Abyss'];
+  // Alle 13 Standard 5v5-Maps inklusive Summit und Corrode
+  const MAPS = [
+    'Ascent', 'Bind', 'Haven', 'Split', 
+    'Icebox', 'Breeze', 'Fracture', 'Pearl', 
+    'Lotus', 'Sunset', 'Abyss', 'Summit', 'Corrode'
+  ];
   
+  // Alle Agenten nach Rolle sortiert, inkl. Tejo, Veto und Waylay
   const AGENTS = [
+    // Duelists
     { name: 'Jett', role: 'Duelist' }, { name: 'Reyna', role: 'Duelist' }, { name: 'Phoenix', role: 'Duelist' },
-    { name: 'Raze', role: 'Duelist' }, { name: 'Yoru', role: 'Duelist' }, { name: 'Neon', role: 'Duelist' }, { name: 'Iso', role: 'Duelist' },
+    { name: 'Raze', role: 'Duelist' }, { name: 'Yoru', role: 'Duelist' }, { name: 'Neon', role: 'Duelist' }, 
+    { name: 'Iso', role: 'Duelist' }, { name: 'Waylay', role: 'Duelist' },
+    // Initiators
     { name: 'Sova', role: 'Initiator' }, { name: 'Breach', role: 'Initiator' }, { name: 'Skye', role: 'Initiator' },
     { name: 'KAY/O', role: 'Initiator' }, { name: 'Fade', role: 'Initiator' }, { name: 'Gekko', role: 'Initiator' },
+    { name: 'Tejo', role: 'Initiator' },
+    // Controllers
     { name: 'Brimstone', role: 'Controller' }, { name: 'Omen', role: 'Controller' }, { name: 'Viper', role: 'Controller' },
     { name: 'Astra', role: 'Controller' }, { name: 'Harbor', role: 'Controller' }, { name: 'Clove', role: 'Controller' },
+    // Sentinels
     { name: 'Killjoy', role: 'Sentinel' }, { name: 'Cypher', role: 'Sentinel' }, { name: 'Sage', role: 'Sentinel' },
-    { name: 'Chamber', role: 'Sentinel' }, { name: 'Deadlock', role: 'Sentinel' }, { name: 'Vyse', role: 'Sentinel' }
+    { name: 'Chamber', role: 'Sentinel' }, { name: 'Deadlock', role: 'Sentinel' }, { name: 'Vyse', role: 'Sentinel' },
+    { name: 'Veto', role: 'Sentinel' }
   ];
 
-  // Lokaler Spieler
   const myId = 'p_' + Math.random().toString(36).substr(2, 6);
   let myName = 'Spieler ' + myId.slice(-3);
 
-  // Raum-ID aus URL oder neu generieren
   let roomId = window.location.hash.replace('#room=', '');
   if (!roomId) {
     roomId = 'val-' + Math.random().toString(36).substr(2, 6);
@@ -222,27 +232,24 @@
   }
   document.getElementById('room-code-display').textContent = roomId;
 
-  // Spielzustand
   let state = {
-    phase: 'SETUP', // 'SETUP', 'MAP_BAN', 'AGENT_BAN', 'SIDE_PICK', 'FINISHED'
-    currentTurn: 't1', // 't1' oder 't2'
+    phase: 'SETUP',
+    currentTurn: 't1',
     t1: { name: 'Team Alpha', players: [], captain: null, side: null },
     t2: { name: 'Team Omega', players: [], captain: null, side: null },
     bannedMaps: [],
     finalMap: null,
-    bannedAgents: [], // Array von Namen
+    bannedAgents: [],
     sidePicker: 't2',
     version: 0
   };
 
-  // MQTT Verbindung (HiveMQ Public Broker über sichere WebSockets)
   const topic = `val2v2_room_${roomId}`;
   const mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
 
   mqttClient.on('connect', () => {
     document.getElementById('conn-dot').className = 'w-2 h-2 rounded-full bg-green-400';
     mqttClient.subscribe(topic);
-    // Neuen State anfragen
     sendAction({ type: 'REQUEST_SYNC' });
   });
 
@@ -266,7 +273,6 @@
 
   function handleIncoming(action) {
     if (action.type === 'REQUEST_SYNC') {
-      // Wenn ich bereits in einem Team bin, sende ich den aktuellen State an den Neuling
       if (state.t1.players.length || state.t2.players.length) {
         sendAction({ type: 'SYNC_STATE', state: state });
       }
@@ -281,12 +287,10 @@
       return;
     }
 
-    // Aktionen anwenden
     if (action.type === 'JOIN') {
       const { teamKey, player } = action;
       const team = state[teamKey];
       if (team.players.length < 2 && !team.players.find(p => p.id === player.id)) {
-        // Zuerst aus anderem Team entfernen
         ['t1', 't2'].forEach(k => {
           state[k].players = state[k].players.filter(p => p.id !== player.id);
           if (state[k].captain === player.id) {
@@ -380,7 +384,6 @@
     }
   }
 
-  // Aktionen auslösen
   window.joinTeam = function(teamKey) {
     const inputName = prompt('Dein In-Game Name / Tag:', myName);
     if (inputName) myName = inputName.trim();
@@ -424,7 +427,6 @@
     }
   };
 
-  // Berechtigungsprüfung
   function canIAct() {
     const activeTeamKey = state.currentTurn;
     const activeTeam = state[activeTeamKey];
@@ -437,14 +439,12 @@
     return null;
   }
 
-  // Rendering
   function render() {
     const myTeam = getMyTeam();
     const isCaptainT1 = state.t1.captain === myId;
     const isCaptainT2 = state.t2.captain === myId;
     const isCurrentTurnCaptain = (state.currentTurn === 't1' && isCaptainT1) || (state.currentTurn === 't2' && isCaptainT2);
 
-    // Rolle & Leave-Button
     const rolePill = document.getElementById('role-pill');
     const leaveBtn = document.getElementById('leave-btn');
     if (myTeam === 't1') {
@@ -461,14 +461,13 @@
       leaveBtn.classList.add('hidden');
     }
 
-    // Statuszeile
     const phaseBadge = document.getElementById('phase-badge');
     const turnAnnounce = document.getElementById('turn-announcement');
     const actionHint = document.getElementById('action-hint');
     const activeTeamName = state[state.currentTurn]?.name || '';
 
     if (state.phase === 'SETUP') {
-      phaseBadge.textContent = 'Phase: Team-Setup';
+      phaseBadge.textContent = 'Phase 1: Team-Setup';
       turnAnnounce.textContent = 'Warte auf Teams & Start';
       actionHint.textContent = 'Slots füllen & "Bann-Phase starten" klicken';
       document.getElementById('start-phase-container').classList.remove('hidden');
@@ -494,17 +493,11 @@
         : 'text-xs px-3 py-1.5 rounded bg-white/5 border border-white/10 text-gray-400 font-medium';
     }
 
-    // Roster rendern
     renderRoster('t1', state.t1, myTeam === 't1', isCaptainT1);
     renderRoster('t2', state.t2, myTeam === 't2', isCaptainT2);
-
-    // Maps rendern
     renderMaps(isCurrentTurnCaptain && state.phase === 'MAP_BAN');
-
-    // Agents rendern
     renderAgents(isCurrentTurnCaptain && state.phase === 'AGENT_BAN');
 
-    // Seiten-Auswahl Box
     const sideBox = document.getElementById('side-selection-container');
     if (state.phase === 'SIDE_PICK') {
       sideBox.classList.remove('hidden');
@@ -514,7 +507,6 @@
       sideBox.classList.add('hidden');
     }
 
-    // Finale Karte
     const sumCard = document.getElementById('final-summary-card');
     if (state.phase === 'FINISHED') {
       sumCard.classList.remove('hidden');
@@ -563,7 +555,7 @@
     const grid = document.getElementById('maps-grid');
     grid.innerHTML = '';
     const remaining = MAPS.filter(m => !state.bannedMaps.includes(m));
-    document.getElementById('maps-left-count').textContent = `${remaining.length} übrig`;
+    document.getElementById('maps-left-count').textContent = `${remaining.length} von 13 übrig`;
 
     MAPS.forEach(map => {
       const isBanned = state.bannedMaps.includes(map);
@@ -609,7 +601,7 @@
 
   function copyRoomLink() {
     navigator.clipboard.writeText(window.location.href);
-    alert('Raum-Link in die Zwischenablage kopiert! Schicke ihn an deine Mitspieler.');
+    alert('Raum-Link in die Zwischenablage kopiert!');
   }
 
   function copyMatchDetails() {
