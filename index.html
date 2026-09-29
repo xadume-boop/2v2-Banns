@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VALORANT 2v2 Map & Agent Bann-System</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- MQTT via WebSockets: Zuverlässig, stabil und ohne Server-Setup -->
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tungsten:wght@600;700&family=Oswald:wght@500;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --val-red: #ff4655;
+      --val-dark: #0f1923;
+      --val-card: #18222d;
+      --val-border: #2c3947;
+      --val-blue: #00f0ff;
+    }
+    body {
+      background-color: var(--val-dark);
+      color: #ece8e1;
+      font-family: 'Inter', sans-serif;
+    }
+    .font-val-header {
+      font-family: 'Oswald', sans-serif;
+      letter-spacing: 0.05em;
+    }
+    .banned-tile {
+      filter: grayscale(100%) brightness(35%);
+      position: relative;
+      cursor: not-allowed !important;
+      pointer-events: none;
+    }
+    .banned-tile::after {
+      content: '✕';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 2.5rem;
+      color: #ff4655;
+      font-weight: 900;
+      text-shadow: 0 0 16px rgba(255, 70, 85, 0.9);
+      pointer-events: none;
+    }
+    .locked-action {
+      opacity: 0.45;
+      cursor: not-allowed !important;
+      pointer-events: none !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col p-3 md:p-6 select-none">
+
+  <!-- Header -->
+  <header class="flex flex-wrap items-center justify-between gap-3 border-b border-[#2c3947] pb-4 mb-4">
+    <div class="flex items-center gap-3">
+      <div class="bg-[#ff4655] w-9 h-9 flex items-center justify-center font-bold text-xl rounded">V</div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-xl md:text-2xl font-bold tracking-wider font-val-header uppercase">VALORANT 2v2</h1>
+          <span class="bg-[#ff4655]/20 text-[#ff4655] text-xs px-2 py-0.5 rounded font-bold uppercase tracking-wider">Bann-System</span>
+        </div>
+        <p class="text-xs text-gray-400">Echtzeit-Synchronisierung • 5v5 Maps</p>
+      </div>
+    </div>
+
+    <!-- Creator Badge & Raum-Controls -->
+    <div class="flex items-center gap-2 md:gap-3 flex-wrap">
+      <div class="text-[11px] uppercase tracking-widest text-gray-400 font-semibold bg-white/5 border border-white/10 px-2.5 py-1 rounded flex items-center gap-1.5 shadow-sm">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#00f0ff] animate-pulse"></span>
+        Made by Adam
+      </div>
+      
+      <div class="flex items-center gap-1.5 bg-[#18222d] border border-[#2c3947] px-2.5 py-1 rounded text-xs">
+        <span id="conn-dot" class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span id="room-code-display" class="font-mono text-gray-200">Verbinde...</span>
+        <button onclick="copyRoomLink()" class="ml-1 bg-white/10 hover:bg-white/20 text-white px-2 py-0.5 rounded text-[11px] transition">Link</button>
+      </div>
+
+      <div id="role-pill" class="text-xs bg-[#2c3947] px-2.5 py-1 rounded font-bold text-gray-300">
+        Zuschauer
+      </div>
+
+      <button id="leave-btn" onclick="leaveTeam()" class="hidden text-xs bg-red-950/60 hover:bg-red-900 border border-red-800 text-red-300 px-2.5 py-1 rounded transition font-semibold">
+        ✕ Team verlassen
+      </button>
+
+      <button onclick="resetMatch()" class="text-xs bg-white/5 hover:bg-white/10 border border-white/20 text-gray-400 hover:text-white px-2 py-1 rounded transition">
+        Reset
+      </button>
+    </div>
+  </header>
+
+  <!-- Banner / Statusanzeige -->
+  <div id="status-bar" class="w-full bg-[#18222d] border border-[#2c3947] p-3 rounded mb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+    <div>
+      <div class="text-[11px] font-bold text-gray-400 uppercase tracking-widest" id="phase-badge">Phase: Team-Setup</div>
+      <div class="text-base md:text-lg font-bold text-white font-val-header tracking-wide mt-0.5" id="turn-announcement">
+        Warte auf Spieler...
+      </div>
+    </div>
+    <div id="action-hint" class="text-xs px-3 py-1.5 rounded bg-white/5 border border-white/10 text-gray-300 font-medium">
+      Wähle ein Team
+    </div>
+  </div>
+
+  <!-- Teams 2v2 Übersicht -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <!-- Team Alpha -->
+    <div class="bg-[#18222d] border border-[#2c3947] p-3.5 rounded flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between pb-2 border-b border-[#2c3947] mb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 bg-[#00f0ff] rounded-sm"></span>
+            <span class="font-val-header font-bold text-lg text-white">TEAM ALPHA</span>
+          </div>
+          <button onclick="joinTeam('t1')" class="text-xs bg-[#00f0ff]/20 hover:bg-[#00f0ff]/30 text-[#00f0ff] border border-[#00f0ff]/40 font-bold px-3 py-1 rounded transition">
+            Beitreten
+          </button>
+        </div>
+        <div class="space-y-1.5" id="t1-roster"></div>
+      </div>
+    </div>
+
+    <!-- Team Omega -->
+    <div class="bg-[#18222d] border border-[#2c3947] p-3.5 rounded flex flex-col justify-between">
+      <div>
+        <div class="flex items-center justify-between pb-2 border-b border-[#2c3947] mb-2.5">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 bg-[#ff4655] rounded-sm"></span>
+            <span class="font-val-header font-bold text-lg text-white">TEAM OMEGA</span>
+          </div>
+          <button onclick="joinTeam('t2')" class="text-xs bg-[#ff4655]/20 hover:bg-[#ff4655]/30 text-[#ff4655] border border-[#ff4655]/40 font-bold px-3 py-1 rounded transition">
+            Beitreten
+          </button>
+        </div>
+        <div class="space-y-1.5" id="t2-roster"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start Button für Phase 1 -->
+  <div id="start-phase-container" class="mb-6 flex justify-center">
+    <button onclick="startBanPhase()" class="bg-[#ff4655] hover:bg-[#e03b49] text-white font-val-header text-lg tracking-wider px-8 py-2.5 rounded font-bold transition shadow-lg shadow-[#ff4655]/20">
+      ▶ BANN-PHASE STARTEN
+    </button>
+  </div>
+
+  <!-- Map Bann-Grid -->
+  <div class="mb-6 bg-[#18222d] border border-[#2c3947] p-4 rounded">
+    <div class="flex items-center justify-between mb-3 border-b border-[#2c3947] pb-2">
+      <h2 class="font-val-header text-lg font-bold text-white flex items-center gap-2">
+        <span class="text-[#ff4655]">■</span> MAP-AUSWAHL & SPERREN (11 5v5 MAPS)
+      </h2>
+      <span class="text-xs font-mono text-gray-400" id="maps-left-count">11 Maps übrig</span>
+    </div>
+    <div id="maps-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2"></div>
+  </div>
+
+  <!-- Agenten Bann-Grid -->
+  <div class="mb-6 bg-[#18222d] border border-[#2c3947] p-4 rounded">
+    <div class="flex items-center justify-between mb-3 border-b border-[#2c3947] pb-2">
+      <h2 class="font-val-header text-lg font-bold text-white flex items-center gap-2">
+        <span class="text-[#ff4655]">■</span> AGENTEN SPERREN (2 PRO TEAM)
+      </h2>
+      <span class="text-xs font-mono text-gray-400" id="agent-bans-count">0/4 gebannt</span>
+    </div>
+    <div id="agents-grid" class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2"></div>
+  </div>
+
+  <!-- Seiten-Auswahl -->
+  <div id="side-selection-container" class="hidden mb-6 bg-[#18222d] border border-[#2c3947] p-4 rounded text-center">
+    <h3 class="font-val-header text-xl text-white mb-2">SEITEN-AUSWAHL</h3>
+    <p class="text-xs text-gray-400 mb-4" id="side-picker-label">Wählt Attack oder Defense:</p>
+    <div class="flex justify-center gap-4">
+      <button onclick="pickSide('ATTACK')" class="bg-red-600 hover:bg-red-500 text-white font-val-header px-6 py-2 rounded text-base">ATTACK (ANGRIFF)</button>
+      <button onclick="pickSide('DEFENSE')" class="bg-blue-600 hover:bg-blue-500 text-white font-val-header px-6 py-2 rounded text-base">DEFENSE (VERTEIDIGUNG)</button>
+    </div>
+  </div>
+
+  <!-- Zusammenfassung / Match Card -->
+  <div id="final-summary-card" class="hidden mb-6 bg-gradient-to-r from-red-950/40 via-[#18222d] to-cyan-950/40 border border-white/20 p-5 rounded">
+    <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+      <div>
+        <span class="text-[10px] uppercase font-bold tracking-widest text-[#00f0ff]">Fertiges Matchup</span>
+        <h2 class="text-2xl font-bold font-val-header text-white" id="final-map-title">MAP: -</h2>
+        <p class="text-xs text-gray-300 mt-1" id="final-details">-</p>
+      </div>
+      <button onclick="copyMatchDetails()" class="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs px-4 py-2 rounded font-bold transition">
+        📋 Zusammenfassung kopieren
+      </button>
+    </div>
+  </div>
+
+<script>
+  // Valorant 5v5 Pool
+  const MAPS = ['Ascent', 'Bind', 'Haven', 'Split', 'Icebox', 'Breeze', 'Fracture', 'Pearl', 'Lotus', 'Sunset', 'Abyss'];
+  
+  const AGENTS = [
+    { name: 'Jett', role: 'Duelist' }, { name: 'Reyna', role: 'Duelist' }, { name: 'Phoenix', role: 'Duelist' },
+    { name: 'Raze', role: 'Duelist' }, { name: 'Yoru', role: 'Duelist' }, { name: 'Neon', role: 'Duelist' }, { name: 'Iso', role: 'Duelist' },
+    { name: 'Sova', role: 'Initiator' }, { name: 'Breach', role: 'Initiator' }, { name: 'Skye', role: 'Initiator' },
+    { name: 'KAY/O', role: 'Initiator' }, { name: 'Fade', role: 'Initiator' }, { name: 'Gekko', role: 'Initiator' },
+    { name: 'Brimstone', role: 'Controller' }, { name: 'Omen', role: 'Controller' }, { name: 'Viper', role: 'Controller' },
+    { name: 'Astra', role: 'Controller' }, { name: 'Harbor', role: 'Controller' }, { name: 'Clove', role: 'Controller' },
+    { name: 'Killjoy', role: 'Sentinel' }, { name: 'Cypher', role: 'Sentinel' }, { name: 'Sage', role: 'Sentinel' },
+    { name: 'Chamber', role: 'Sentinel' }, { name: 'Deadlock', role: 'Sentinel' }, { name: 'Vyse', role: 'Sentinel' }
+  ];
+
+  // Lokaler Spieler
+  const myId = 'p_' + Math.random().toString(36).substr(2, 6);
+  let myName = 'Spieler ' + myId.slice(-3);
+
+  // Raum-ID aus URL oder neu generieren
+  let roomId = window.location.hash.replace('#room=', '');
+  if (!roomId) {
+    roomId = 'val-' + Math.random().toString(36).substr(2, 6);
+    window.location.hash = '#room=' + roomId;
+  }
+  document.getElementById('room-code-display').textContent = roomId;
+
+  // Spielzustand
+  let state = {
+    phase: 'SETUP', // 'SETUP', 'MAP_BAN', 'AGENT_BAN', 'SIDE_PICK', 'FINISHED'
+    currentTurn: 't1', // 't1' oder 't2'
+    t1: { name: 'Team Alpha', players: [], captain: null, side: null },
+    t2: { name: 'Team Omega', players: [], captain: null, side: null },
+    bannedMaps: [],
+    finalMap: null,
+    bannedAgents: [], // Array von Namen
+    sidePicker: 't2',
+    version: 0
+  };
+
+  // MQTT Verbindung (HiveMQ Public Broker über sichere WebSockets)
+  const topic = `val2v2_room_${roomId}`;
+  const mqttClient = mqtt.connect('wss://broker.hivemq.com:8884/mqtt');
+
+  mqttClient.on('connect', () => {
+    document.getElementById('conn-dot').className = 'w-2 h-2 rounded-full bg-green-400';
+    mqttClient.subscribe(topic);
+    // Neuen State anfragen
+    sendAction({ type: 'REQUEST_SYNC' });
+  });
+
+  mqttClient.on('error', () => {
+    document.getElementById('conn-dot').className = 'w-2 h-2 rounded-full bg-red-500';
+  });
+
+  mqttClient.on('message', (t, payload) => {
+    try {
+      const msg = JSON.parse(payload.toString());
+      handleIncoming(msg);
+    } catch(e) {
+      console.error(e);
+    }
+  });
+
+  function sendAction(action) {
+    action.sender = myId;
+    mqttClient.publish(topic, JSON.stringify(action));
+  }
+
+  function handleIncoming(action) {
+    if (action.type === 'REQUEST_SYNC') {
+      // Wenn ich bereits in einem Team bin, sende ich den aktuellen State an den Neuling
+      if (state.t1.players.length || state.t2.players.length) {
+        sendAction({ type: 'SYNC_STATE', state: state });
+      }
+      return;
+    }
+
+    if (action.type === 'SYNC_STATE') {
+      if (action.state.version >= state.version) {
+        state = action.state;
+        render();
+      }
+      return;
+    }
+
+    // Aktionen anwenden
+    if (action.type === 'JOIN') {
+      const { teamKey, player } = action;
+      const team = state[teamKey];
+      if (team.players.length < 2 && !team.players.find(p => p.id === player.id)) {
+        // Zuerst aus anderem Team entfernen
+        ['t1', 't2'].forEach(k => {
+          state[k].players = state[k].players.filter(p => p.id !== player.id);
+          if (state[k].captain === player.id) {
+            state[k].captain = state[k].players[0]?.id || null;
+          }
+        });
+        team.players.push(player);
+        if (!team.captain) team.captain = player.id;
+        state.version++;
+        render();
+      }
+    }
+
+    if (action.type === 'LEAVE') {
+      ['t1', 't2'].forEach(k => {
+        state[k].players = state[k].players.filter(p => p.id !== action.playerId);
+        if (state[k].captain === action.playerId) {
+          state[k].captain = state[k].players[0]?.id || null;
+        }
+      });
+      state.version++;
+      render();
+    }
+
+    if (action.type === 'SET_CAPTAIN') {
+      state[action.teamKey].captain = action.playerId;
+      state.version++;
+      render();
+    }
+
+    if (action.type === 'START_BANS') {
+      state.phase = 'MAP_BAN';
+      state.currentTurn = 't1';
+      state.version++;
+      render();
+    }
+
+    if (action.type === 'BAN_MAP') {
+      if (!state.bannedMaps.includes(action.mapName)) {
+        state.bannedMaps.push(action.mapName);
+        const remaining = MAPS.filter(m => !state.bannedMaps.includes(m));
+        if (remaining.length === 1) {
+          state.finalMap = remaining[0];
+          state.phase = 'AGENT_BAN';
+          state.currentTurn = 't1';
+        } else {
+          state.currentTurn = state.currentTurn === 't1' ? 't2' : 't1';
+        }
+        state.version++;
+        render();
+      }
+    }
+
+    if (action.type === 'BAN_AGENT') {
+      if (!state.bannedAgents.includes(action.agentName) && state.bannedAgents.length < 4) {
+        state.bannedAgents.push(action.agentName);
+        if (state.bannedAgents.length >= 4) {
+          state.phase = 'SIDE_PICK';
+          state.currentTurn = state.sidePicker;
+        } else {
+          state.currentTurn = state.currentTurn === 't1' ? 't2' : 't1';
+        }
+        state.version++;
+        render();
+      }
+    }
+
+    if (action.type === 'PICK_SIDE') {
+      const picker = state.sidePicker;
+      const other = picker === 't1' ? 't2' : 't1';
+      state[picker].side = action.side;
+      state[other].side = action.side === 'ATTACK' ? 'DEFENSE' : 'ATTACK';
+      state.phase = 'FINISHED';
+      state.version++;
+      render();
+    }
+
+    if (action.type === 'RESET') {
+      state = {
+        phase: 'SETUP',
+        currentTurn: 't1',
+        t1: { name: 'Team Alpha', players: [], captain: null, side: null },
+        t2: { name: 'Team Omega', players: [], captain: null, side: null },
+        bannedMaps: [],
+        finalMap: null,
+        bannedAgents: [],
+        sidePicker: 't2',
+        version: state.version + 1
+      };
+      render();
+    }
+  }
+
+  // Aktionen auslösen
+  window.joinTeam = function(teamKey) {
+    const inputName = prompt('Dein In-Game Name / Tag:', myName);
+    if (inputName) myName = inputName.trim();
+    sendAction({ type: 'JOIN', teamKey: teamKey, player: { id: myId, name: myName } });
+  };
+
+  window.leaveTeam = function() {
+    sendAction({ type: 'LEAVE', playerId: myId });
+  };
+
+  window.passCaptain = function(teamKey, playerId) {
+    sendAction({ type: 'SET_CAPTAIN', teamKey: teamKey, playerId: playerId });
+  };
+
+  window.startBanPhase = function() {
+    if (state.t1.players.length === 0 || state.t2.players.length === 0) {
+      alert('Beide Teams müssen mindestens 1 Spieler haben!');
+      return;
+    }
+    sendAction({ type: 'START_BANS' });
+  };
+
+  window.banMap = function(mapName) {
+    if (!canIAct()) return;
+    sendAction({ type: 'BAN_MAP', mapName: mapName });
+  };
+
+  window.banAgent = function(agentName) {
+    if (!canIAct()) return;
+    sendAction({ type: 'BAN_AGENT', agentName: agentName });
+  };
+
+  window.pickSide = function(side) {
+    if (!canIAct()) return;
+    sendAction({ type: 'PICK_SIDE', side: side });
+  };
+
+  window.resetMatch = function() {
+    if (confirm('Match wirklich zurücksetzen?')) {
+      sendAction({ type: 'RESET' });
+    }
+  };
+
+  // Berechtigungsprüfung
+  function canIAct() {
+    const activeTeamKey = state.currentTurn;
+    const activeTeam = state[activeTeamKey];
+    return activeTeam.captain === myId;
+  }
+
+  function getMyTeam() {
+    if (state.t1.players.some(p => p.id === myId)) return 't1';
+    if (state.t2.players.some(p => p.id === myId)) return 't2';
+    return null;
+  }
+
+  // Rendering
+  function render() {
+    const myTeam = getMyTeam();
+    const isCaptainT1 = state.t1.captain === myId;
+    const isCaptainT2 = state.t2.captain === myId;
+    const isCurrentTurnCaptain = (state.currentTurn === 't1' && isCaptainT1) || (state.currentTurn === 't2' && isCaptainT2);
+
+    // Rolle & Leave-Button
+    const rolePill = document.getElementById('role-pill');
+    const leaveBtn = document.getElementById('leave-btn');
+    if (myTeam === 't1') {
+      rolePill.className = 'text-xs bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/40 px-2.5 py-1 rounded font-bold';
+      rolePill.textContent = isCaptainT1 ? '★ Team Alpha (Captain)' : 'Team Alpha';
+      leaveBtn.classList.remove('hidden');
+    } else if (myTeam === 't2') {
+      rolePill.className = 'text-xs bg-[#ff4655]/20 text-[#ff4655] border border-[#ff4655]/40 px-2.5 py-1 rounded font-bold';
+      rolePill.textContent = isCaptainT2 ? '★ Team Omega (Captain)' : 'Team Omega';
+      leaveBtn.classList.remove('hidden');
+    } else {
+      rolePill.className = 'text-xs bg-[#2c3947] text-gray-400 px-2.5 py-1 rounded font-bold';
+      rolePill.textContent = 'Zuschauer';
+      leaveBtn.classList.add('hidden');
+    }
+
+    // Statuszeile
+    const phaseBadge = document.getElementById('phase-badge');
+    const turnAnnounce = document.getElementById('turn-announcement');
+    const actionHint = document.getElementById('action-hint');
+    const activeTeamName = state[state.currentTurn]?.name || '';
+
+    if (state.phase === 'SETUP') {
+      phaseBadge.textContent = 'Phase: Team-Setup';
+      turnAnnounce.textContent = 'Warte auf Teams & Start';
+      actionHint.textContent = 'Slots füllen & "Bann-Phase starten" klicken';
+      document.getElementById('start-phase-container').classList.remove('hidden');
+    } else {
+      document.getElementById('start-phase-container').classList.add('hidden');
+      if (state.phase === 'MAP_BAN') {
+        phaseBadge.textContent = 'Phase 2: Map-Auswahl';
+        turnAnnounce.innerHTML = `<span class="${state.currentTurn === 't1' ? 'text-[#00f0ff]' : 'text-[#ff4655]'} font-bold">${activeTeamName}</span> sperrt eine Map`;
+      } else if (state.phase === 'AGENT_BAN') {
+        phaseBadge.textContent = 'Phase 3: Agenten sperren';
+        turnAnnounce.innerHTML = `<span class="${state.currentTurn === 't1' ? 'text-[#00f0ff]' : 'text-[#ff4655]'} font-bold">${activeTeamName}</span> sperrt einen Agenten (${state.bannedAgents.length}/4)`;
+      } else if (state.phase === 'SIDE_PICK') {
+        phaseBadge.textContent = 'Phase 4: Seiten-Auswahl';
+        turnAnnounce.innerHTML = `<span class="${state.currentTurn === 't1' ? 'text-[#00f0ff]' : 'text-[#ff4655]'} font-bold">${activeTeamName}</span> wählt Attack / Defense`;
+      } else if (state.phase === 'FINISHED') {
+        phaseBadge.textContent = 'Match Bereit!';
+        turnAnnounce.textContent = 'Bann-Phase erfolgreich abgeschlossen';
+      }
+
+      actionHint.textContent = isCurrentTurnCaptain ? '⚡ DU BIST AM ZUG!' : 'Warte auf gegnerischen Zug...';
+      actionHint.className = isCurrentTurnCaptain 
+        ? 'text-xs px-3 py-1.5 rounded bg-green-500/20 border border-green-500 text-green-300 font-bold animate-pulse'
+        : 'text-xs px-3 py-1.5 rounded bg-white/5 border border-white/10 text-gray-400 font-medium';
+    }
+
+    // Roster rendern
+    renderRoster('t1', state.t1, myTeam === 't1', isCaptainT1);
+    renderRoster('t2', state.t2, myTeam === 't2', isCaptainT2);
+
+    // Maps rendern
+    renderMaps(isCurrentTurnCaptain && state.phase === 'MAP_BAN');
+
+    // Agents rendern
+    renderAgents(isCurrentTurnCaptain && state.phase === 'AGENT_BAN');
+
+    // Seiten-Auswahl Box
+    const sideBox = document.getElementById('side-selection-container');
+    if (state.phase === 'SIDE_PICK') {
+      sideBox.classList.remove('hidden');
+      document.getElementById('side-picker-label').textContent = `${activeTeamName} wählt die Seite:`;
+      sideBox.classList.toggle('locked-action', !isCurrentTurnCaptain);
+    } else {
+      sideBox.classList.add('hidden');
+    }
+
+    // Finale Karte
+    const sumCard = document.getElementById('final-summary-card');
+    if (state.phase === 'FINISHED') {
+      sumCard.classList.remove('hidden');
+      document.getElementById('final-map-title').textContent = `MAP: ${state.finalMap.toUpperCase()}`;
+      document.getElementById('final-details').innerHTML = `
+        <strong>Team Alpha:</strong> ${state.t1.side || '-'} • <strong>Team Omega:</strong> ${state.t2.side || '-'}<br>
+        <strong>Gebannte Agenten:</strong> ${state.bannedAgents.join(', ') || 'Keine'}
+      `;
+    } else {
+      sumCard.classList.add('hidden');
+    }
+  }
+
+  function renderRoster(teamKey, team, isMyTeam, amICaptain) {
+    const container = document.getElementById(`${teamKey}-roster`);
+    container.innerHTML = '';
+
+    for (let i = 0; i < 2; i++) {
+      const player = team.players[i];
+      const slotDiv = document.createElement('div');
+      slotDiv.className = 'flex items-center justify-between bg-black/30 border border-[#2c3947] px-3 py-2 rounded text-xs';
+
+      if (player) {
+        const isCap = team.captain === player.id;
+        slotDiv.innerHTML = `
+          <div class="flex items-center gap-2">
+            ${isCap ? '<span class="text-amber-400 font-bold">★</span>' : '<span class="text-gray-500">•</span>'}
+            <span class="font-semibold text-white">${escapeHtml(player.name)} ${player.id === myId ? '<span class="text-gray-400 text-[10px]">(Du)</span>' : ''}</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            ${amICaptain && !isCap ? `<button onclick="passCaptain('${teamKey}', '${player.id}')" class="text-[10px] bg-white/10 hover:bg-white/20 text-gray-300 px-2 py-0.5 rounded">Binde geben</button>` : ''}
+            ${player.id === myId ? `<button onclick="leaveTeam()" class="text-[10px] bg-red-900/60 hover:bg-red-800 text-red-200 px-2 py-0.5 rounded">✕</button>` : ''}
+          </div>
+        `;
+      } else {
+        slotDiv.innerHTML = `
+          <span class="text-gray-500 italic">Slot ${i + 1} - Offen</span>
+          <button onclick="joinTeam('${teamKey}')" class="text-[11px] text-gray-400 hover:text-white underline">Beitreten</button>
+        `;
+      }
+      container.appendChild(slotDiv);
+    }
+  }
+
+  function renderMaps(canPick) {
+    const grid = document.getElementById('maps-grid');
+    grid.innerHTML = '';
+    const remaining = MAPS.filter(m => !state.bannedMaps.includes(m));
+    document.getElementById('maps-left-count').textContent = `${remaining.length} übrig`;
+
+    MAPS.forEach(map => {
+      const isBanned = state.bannedMaps.includes(map);
+      const isPick = state.finalMap === map;
+      const btn = document.createElement('button');
+      btn.className = `p-2.5 rounded border text-center font-val-header tracking-wider transition relative ${
+        isPick ? 'bg-green-600/40 border-green-500 text-white font-bold' :
+        isBanned ? 'banned-tile border-red-950 bg-red-950/20' :
+        canPick ? 'bg-[#18222d] border-[#2c3947] hover:border-red-500 hover:bg-red-500/10 text-white cursor-pointer' :
+        'bg-[#18222d] border-[#2c3947] text-gray-300 locked-action'
+      }`;
+      btn.innerHTML = `<span class="block text-sm font-bold uppercase">${map}</span>`;
+      if (canPick && !isBanned) {
+        btn.onclick = () => banMap(map);
+      }
+      grid.appendChild(btn);
+    });
+  }
+
+  function renderAgents(canPick) {
+    const grid = document.getElementById('agents-grid');
+    grid.innerHTML = '';
+    document.getElementById('agent-bans-count').textContent = `${state.bannedAgents.length}/4 gebannt`;
+
+    AGENTS.forEach(ag => {
+      const isBanned = state.bannedAgents.includes(ag.name);
+      const btn = document.createElement('button');
+      btn.className = `p-2 rounded border text-left transition relative ${
+        isBanned ? 'banned-tile border-red-950 bg-red-950/20' :
+        canPick ? 'bg-[#18222d] border-[#2c3947] hover:border-red-500 hover:bg-red-500/10 text-white cursor-pointer' :
+        'bg-[#18222d] border-[#2c3947] text-gray-400 locked-action'
+      }`;
+      btn.innerHTML = `
+        <div class="text-[10px] uppercase font-semibold text-gray-400">${ag.role}</div>
+        <div class="text-xs font-bold text-white">${ag.name}</div>
+      `;
+      if (canPick && !isBanned) {
+        btn.onclick = () => banAgent(ag.name);
+      }
+      grid.appendChild(btn);
+    });
+  }
+
+  function copyRoomLink() {
+    navigator.clipboard.writeText(window.location.href);
+    alert('Raum-Link in die Zwischenablage kopiert! Schicke ihn an deine Mitspieler.');
+  }
+
+  function copyMatchDetails() {
+    const text = `VALORANT 2v2 CUSTOM MATCH
+Map: ${state.finalMap}
+Gebannte Agenten: ${state.bannedAgents.join(', ') || 'Keine'}
+Team Alpha: ${state.t1.players.map(p => p.name).join(' & ')} (${state.t1.side})
+Team Omega: ${state.t2.players.map(p => p.name).join(' & ')} (${state.t2.side})`;
+    navigator.clipboard.writeText(text);
+    alert('Match-Zusammenfassung kopiert!');
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  render();
+</script>
+</body>
+</html>
