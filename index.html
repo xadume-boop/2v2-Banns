@@ -63,7 +63,7 @@
           <h1 class="text-xl md:text-2xl font-bold tracking-wider font-val-header uppercase">VALORANT 2v2</h1>
           <span class="bg-[#ff4655]/20 text-[#ff4655] text-xs px-2 py-0.5 rounded font-bold uppercase tracking-wider">Bann-System</span>
         </div>
-        <p class="text-xs text-gray-400">Echtzeit-Synchronisierung • Alle 13 Standard 5v5 Maps</p>
+        <p class="text-xs text-gray-400">Echtzeit-Synchronisierung • 5 Maps Pool</p>
       </div>
     </div>
 
@@ -149,18 +149,18 @@
     </button>
   </div>
 
-  <!-- Map Bann-Grid (Alle 13 Maps) -->
+  <!-- Map Bann-Grid (Nur 5 Maps) -->
   <div class="mb-6 bg-[#18222d] border border-[#2c3947] p-4 rounded">
     <div class="flex items-center justify-between mb-3 border-b border-[#2c3947] pb-2">
       <h2 class="font-val-header text-lg font-bold text-white flex items-center gap-2">
-        <span class="text-[#ff4655]">■</span> MAP-AUSWAHL & SPERREN (ALLE 13 STANDARD MAPS)
+        <span class="text-[#ff4655]">■</span> MAP-AUSWAHL & SPERREN (5 MAPS)
       </h2>
-      <span class="text-xs font-mono text-gray-400" id="maps-left-count">13 Maps übrig</span>
+      <span class="text-xs font-mono text-gray-400" id="maps-left-count">5 Maps übrig</span>
     </div>
-    <div id="maps-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2"></div>
+    <div id="maps-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2"></div>
   </div>
 
-  <!-- Agenten Bann-Grid (inkl. Tejo, Veto, Waylay, Miks) -->
+  <!-- Agenten Bann-Grid -->
   <div class="mb-6 bg-[#18222d] border border-[#2c3947] p-4 rounded">
     <div class="flex items-center justify-between mb-3 border-b border-[#2c3947] pb-2">
       <h2 class="font-val-header text-lg font-bold text-white flex items-center gap-2">
@@ -196,12 +196,8 @@
   </div>
 
 <script>
-  // Alle 13 Standard 5v5-Maps inklusive Summit und Corrode
-  const MAPS = [
-    'Ascent', 'Bind', 'Haven', 'Split', 
-    'Icebox', 'Breeze', 'Fracture', 'Pearl', 
-    'Lotus', 'Sunset', 'Abyss', 'Summit', 'Corrode'
-  ];
+  // Nur die 5 gewünschten Maps
+  const MAPS = ['Bind', 'Haven', 'Lotus', 'Split', 'Sunset'];
   
   // Alle Agenten inkl. Tejo, Veto, Waylay und Miks
   const AGENTS = [
@@ -556,13 +552,13 @@
     const grid = document.getElementById('maps-grid');
     grid.innerHTML = '';
     const remaining = MAPS.filter(m => !state.bannedMaps.includes(m));
-    document.getElementById('maps-left-count').textContent = `${remaining.length} von 13 übrig`;
+    document.getElementById('maps-left-count').textContent = `${remaining.length} von 5 übrig`;
 
     MAPS.forEach(map => {
       const isBanned = state.bannedMaps.includes(map);
       const isPick = state.finalMap === map;
       const btn = document.createElement('button');
-      btn.className = `p-2.5 rounded border text-center font-val-header tracking-wider transition relative ${
+      btn.className = `p-3 rounded border text-center font-val-header tracking-wider transition relative ${
         isPick ? 'bg-green-600/40 border-green-500 text-white font-bold' :
         isBanned ? 'banned-tile border-red-950 bg-red-950/20' :
         canPick ? 'bg-[#18222d] border-[#2c3947] hover:border-red-500 hover:bg-red-500/10 text-white cursor-pointer' :
